@@ -9,9 +9,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.*;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 public class VisionMain {
     class X {
@@ -507,6 +509,99 @@ public class VisionMain {
         IntStream.of(arr).map(compose).forEach(System.out::println);
         OtherTool.printSplitLine();
         IntStream.of(arr)
+                .map(compose)
+                .map(andThen)
+                .forEach(System.out::println);
+    }
+
+    @Test
+    public void testLongBinaryOperator() {
+        LongBinaryOperator add = ((l, r) -> l +r);
+        LongBinaryOperator mul = (l,r) -> l * r;
+
+        System.out.println(LongStream.of(1,2,3,4,5)
+                .reduce(add)
+                .orElse(0));
+
+        System.out.println(mul.applyAsLong(100, 100));
+    }
+
+    @Test
+    public void testLongConsumer() {
+        AtomicLong total = new AtomicLong();
+        LongConsumer func1 = v -> total.addAndGet(v);
+        LongConsumer after = v -> total.updateAndGet(v1 -> v1 * 10);
+        func1.accept(10);
+        System.out.println(total.get());
+        func1.andThen(after).accept(10);
+        System.out.println(total.get());
+    }
+
+    @Test
+    public void testLongFunction() {
+        LongFunction<String> func1 = v -> String.format("Hello:%s", v);
+        System.out.println(func1.apply(1000));
+    }
+
+    @Test
+    public void testLongPredicate() {
+        long upBound = 100l;
+        long downBound = -100l;
+
+        LongPredicate isPositive = v -> v > 0;
+        LongPredicate isLessThanPositive = v -> v < upBound;
+        LongPredicate isLessThanNegative = v -> v < downBound;
+        LongPredicate isGreaterThan = v -> v > upBound;
+
+        LongPredicate isBetween = isPositive.and(isLessThanPositive);
+        LongPredicate isNotBetween = isBetween.negate();
+        LongPredicate isMatch = isLessThanNegative.or(isGreaterThan);
+
+        long[] arr = {-1000l,-200l,-100l,-10l,-1l,0l,1l, 10l, 100l, 200l, 300l, 1000l};
+        System.out.println(String.format("isBetween(%s,%s):", 0l, upBound));
+        LongStream.of(arr).filter(isBetween).forEach(System.out::println);
+        OtherTool.printSplitLine();
+        System.out.println(String.format("isNotBetween(%s,%s):", 0l, upBound));
+        LongStream.of(arr).filter(isNotBetween).forEach(System.out::println);
+        OtherTool.printSplitLine();
+        System.out.println(String.format("< %s, > %s:", downBound, upBound));
+        LongStream.of(arr).filter(isMatch).forEach(System.out::println);
+    }
+
+    @Test
+    public void testLongSupplier() {
+        LongSupplier func1 = () -> new Random().nextLong();
+        for(int i=0; i<5; i++) {
+            System.out.println(func1.getAsLong());
+        }
+    }
+
+    @Test
+    public void testLongToDoubleFunction() {
+        LongToDoubleFunction func1 = v -> Math.random() * v ;
+        System.out.println(func1.applyAsDouble(938));
+    }
+
+    @Test
+    public void testLongToIntFunction() {
+        LongToIntFunction func1 = v -> (int) ((v * 210) / 5);
+        System.out.println(func1.applyAsInt(1));
+    }
+
+    @Test
+    public void testLongUnaryOperator() {
+        LongUnaryOperator add = v -> v+v;
+        LongUnaryOperator before = v -> v*v;
+        LongUnaryOperator after = v -> v / 2;
+        LongUnaryOperator compose = add.compose(before);
+        LongUnaryOperator andThen = add.andThen(after);
+        LongUnaryOperator identity = LongUnaryOperator.identity();
+        System.out.println("identity:" + identity.applyAsLong(1000));
+
+        long[] arr = {1,2,3,4,5};
+        LongStream.of(arr).map(compose).forEach(System.out::println);
+        OtherTool.printSplitLine();
+        LongStream.of(arr)
                 .map(compose)
                 .map(andThen)
                 .forEach(System.out::println);
