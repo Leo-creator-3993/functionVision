@@ -1,13 +1,12 @@
 package com.future.function.vision;
 
 import com.future.function.vision.tool.OtherTool;
+import com.github.javafaker.Faker;
 import org.junit.Test;
 
 import java.text.DecimalFormat;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.*;
@@ -15,7 +14,7 @@ import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
-public class VisionMain {
+public class FunctionTestMain {
     class X {
         public void m1() {
             System.out.println("X.m1()");
@@ -62,6 +61,8 @@ public class VisionMain {
     class Person extends C {
         private String name;
         private int age;
+        private double balance;
+        private long mileage;
 
         public int getAge() {
             return age;
@@ -79,14 +80,55 @@ public class VisionMain {
             this.name = name;
         }
 
+        public double getBalance() {
+            return balance;
+        }
+
+        public void setBalance(double balance) {
+            this.balance = balance;
+        }
+
+        public long getMileage() {
+            return mileage;
+        }
+
+        public void setMileage(long mileage) {
+            this.mileage = mileage;
+        }
+
         public Person(String name, int age) {
             this.name = name;
             this.age = age;
         }
 
+        public Person(String name, int age, double balance) {
+            this.name = name;
+            this.age = age;
+            this.balance = balance;
+        }
+
         @Override
         public String toString() {
-            return String.format("name:%s, age:%s", name, age);
+            return String.format("name:%s, age:%s, balance:%s", name, age, balance);
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if(other == null || this.getClass() != other.getClass()) {
+                return false;
+            }
+
+            if(this == other) {
+                return true;
+            }
+
+            Person p = (Person) other;
+            return this.getName().equals(p.getName()) && this.getAge() == ((Person) other).getAge();
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, age);
         }
     }
 
@@ -119,6 +161,20 @@ public class VisionMain {
 
         BiConsumer<B,C> combineConsumer = biConsumer.andThen(after).andThen(after2).andThen(after3).andThen(after4);
         combineConsumer.accept(new B(), new C());
+    }
+
+    @Test
+    public void testBiConsumer_1() {
+        List<String> list = new ArrayList<>();
+        BiConsumer<List<String>, String> accumulator = List::add;
+        accumulator.accept(list, "hello");
+        System.out.println(list);
+
+        BiConsumer<List<String>, String> acc2 = (v1, v2) -> {
+            v1.add(v2);
+        };
+        acc2.accept(list, "mm");
+        System.out.println(list);
     }
 
     @Test
@@ -605,5 +661,161 @@ public class VisionMain {
                 .map(compose)
                 .map(andThen)
                 .forEach(System.out::println);
+    }
+
+    @Test
+    public void testObjDoubleConsumer() {
+        Person p = new Person("Linus", 63, 100900008.28);
+        ObjDoubleConsumer<Person> func1 = (person, newBalance) -> {
+            System.out.println("==> before: ");
+            System.out.println(person);
+            person.setBalance(newBalance);
+        };
+        func1.accept(p, 200039830.99);
+        System.out.println("==> after: ");
+        System.out.println(p);
+    }
+
+    @Test
+    public void testObjIntConsumer() throws InterruptedException {
+        String name = "Mark";
+        Person person = new Person(name, 17);
+        ObjIntConsumer<Person> grow = (p, age) -> {
+            System.out.println("==> before: ");
+            System.out.println(p);
+            p.setAge(age);
+        };
+        grow.accept(person, 18);
+
+        Thread t = new Thread(() -> {
+            int count = 5;
+            while (count > 0) {
+                System.out.println(String.format("倒计时 ==> %s", count));
+                try {
+                    TimeUnit.SECONDS.sleep(1); // 每秒休眠一次
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                count--; // 递减计数器
+            }
+            System.out.println("Surprise!");
+        });
+        t.start();
+        t.join();
+        System.out.println(String.format("亲爱的%s, 祝你%s岁生日快乐!", person.getName(), person.getAge()));
+    }
+
+    @Test
+    public void testObjLongConsumer() {
+        Person p1 = new Person("Andy", 15);
+        ObjLongConsumer<Person> func1 = Person::setMileage;
+        func1.accept(p1, 10000);
+        System.out.println(p1.getMileage());
+    }
+
+    @Test
+    public void testPredicate(){
+        Predicate<Person> func1 = (p) -> "Mark".equals(p.getName());
+        System.out.println(func1.test(new Person("mark", 20)));
+        System.out.println(func1.test(new Person("Mark", 20)));
+
+        OtherTool.printSplitLine();
+        Predicate<Person> other = (p) -> 18 == p.getAge();
+        Predicate<Person> combine = func1.and(other);
+        System.out.println(combine.test(new Person("Mark", 20)));
+        System.out.println(combine.test(new Person("Mark", 18)));
+
+        OtherTool.printSplitLine();
+        Predicate<Person> func1Negate = func1.negate();
+        System.out.println(func1Negate.test(new Person("andy", 66)));
+        System.out.println(func1Negate.test(new Person("Mark", 30)));
+
+        OtherTool.printSplitLine();
+        Predicate<Person> other2 = (p) -> p.getBalance() > 1000000.00;
+        Predicate<Person> combine2 = other.or(other2);
+        System.out.println(combine2.test(new Person("MM", 18)));
+        System.out.println(combine2.test(new Person("UU", 81)));
+        System.out.println(combine2.test(new Person("KK", 50, 1000001.00)));
+
+        OtherTool.printSplitLine();
+        Predicate<Person> func2 = Predicate.isEqual(new Person("11", 11));
+        System.out.println(func2.test(new Person("11", 11)));//重写Person equals方法
+    }
+
+    @Test
+    public void testSupplier() throws InterruptedException {
+       Thread t =  new Thread(()-> {
+            System.out.println("===> 天下第一武道会决赛正式开始...");
+            Supplier<Person> func1 = () -> {
+                int age = new Random().nextInt(101);
+                Faker faker = new Faker(new Locale("zh", "CN"));
+                String name = faker.name().fullName();
+                return new Person(name, age, new Random().nextInt(Integer.MAX_VALUE));
+            };
+            System.out.println("欢迎参赛选手 ==>" + new Person("孙悟空", Integer.MAX_VALUE, Double.MAX_VALUE));
+            try {
+                TimeUnit.SECONDS.sleep(1);
+                for(int i=0; i < 10; i++) {
+                    System.out.println("欢迎参赛选手 ==>" + func1.get());
+                    TimeUnit.SECONDS.sleep(1);
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+       t.start();
+       t.join();
+    }
+
+    @Test
+    public void testToDoubleBiFunction() {
+        ToDoubleBiFunction<Person, Person> func1 = (p1, p2) -> p1.getBalance() + p2.getBalance();
+        System.out.println(func1.applyAsDouble(new Person("A", 20, 199.00),
+                new Person("B", 22, 299.00)));
+    }
+
+    @Test
+    public void testToDoubleFunction() {
+        ToDoubleFunction<Person> func1 = Person::getBalance;
+        System.out.println(func1.applyAsDouble(new Person("B", 30, 1999900.28)));
+    }
+
+    @Test
+    public void testToIntBiFunction() {
+        ToIntBiFunction<String, String> func1 = (s1, s2) -> s1.length() + s2.length();
+        System.out.println(func1.applyAsInt("day", "etc."));
+    }
+
+    @Test
+    public void testToIntFunction() {
+        ToIntFunction<Person> func1 = p -> {
+          int nameLen = p.getName().length();
+          int classNameLen = this.getClass().getName().length();
+          int random = new Random().nextInt(1000);
+          return Math.abs(((random / 17) + nameLen) * classNameLen);
+        };
+
+        System.out.println(func1.applyAsInt(new Person("Mark", 18)));
+    }
+
+    @Test
+    public void testToLongBiFunction() {
+        ToLongBiFunction<Long, Long> func1 = Long::sum;
+        long sum = LongStream.of(1,2,3,4,5)
+                .reduce(0, func1::applyAsLong);
+        System.out.println(sum);
+    }
+
+    @Test
+    public void testToLongFunction() {
+        ToLongFunction<Person> func1 = Person::getAge;
+        System.out.println(func1.applyAsLong(new Person("ABA", 10)));
+    }
+
+    @Test
+    public void testUnaryOperator() {
+        UnaryOperator<String> func1 = UnaryOperator.identity();
+        System.out.println(func1.apply("原样返回"));
     }
 }
